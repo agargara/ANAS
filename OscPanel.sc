@@ -1,11 +1,14 @@
-OscPanel {
-	var parent, <>left, <>top, <>nDef, <>outs, <clockPanel, <>composite, <>labelKnob1, <>labelKnob2, <>labelKnob3, <>labelKnob4, <>labelKnob5, <>labelKnob6, <labelKnob7, <labelKnob8, <>selector1, <>selector2, <>outputButtons, <>freqButton, <>oscType, <resetButton, <syncButton, <>lockButton, <>type, <>fadeTime, <>noteArrayField, <>transposeField, <>noteArray, <>transpose, <label, <label2, <label3, <>distort, <>distortSelector, <>lock, <focusList, <focus, <>syncToClock;
+OscPanel : ANASPanel {
+	var <clockPanel, <>labelKnob1, <>labelKnob2, <>labelKnob3, <>labelKnob4, <>labelKnob5, <>labelKnob6, <labelKnob7, <labelKnob8, <>selector1, <>selector2, <>outputButtons, <>freqButton, <>oscType, <resetButton, <syncButton, <>lockButton, <>type, <>fadeTime, <>noteArrayField, <>transposeField, <>noteArray, <>transpose, <>distort, <>distortSelector, <>lock, <>syncToClock;
 	*new {
-		arg parent, left, top, nDef, outs, clockPanel;
-		^super.newCopyArgs(parent, left, top, nDef, outs, clockPanel).initOscPanel;
+		arg parent, bounds, nDef, outs, clockPanel;
+		^super.newCopyArgs(parent, bounds, nDef, outs).initOscPanel(clockPanel);
 	}
 
 	initOscPanel {
+		arg clockPanelArg;
+		clockPanel = clockPanelArg;
+		this.initANASPanel;
 		focus = 0;
 		syncToClock = 0;
 		type = \DSaw;
@@ -13,9 +16,6 @@ OscPanel {
 		noteArray = [0];
 		transpose = 0;
 		distort = 0;
-		composite = CompositeView.new(parent, Rect(left, top, 192, 300));
-		composite.background_(~colourList.at(nDef.key)).focusColor_(Color.red);
-		composite.canFocus_(true);
 		composite.keyDownAction_({|v,c,m,u,k|
 			var keys = [m, k];
 			switch(keys,
@@ -49,6 +49,15 @@ OscPanel {
 		label2.stringColor = Color.new(1,1,1,0.4);
 		label2.align = \center;
 		label2.background = Color(0,0,0,0);
+		label2.toolTip_("Oscillator panel \n
+freq, amp: Oscillator frequency and final amplitude control\n
+preFilter: (DSaw and DPulse only) fixed band pass filter before distortion, tone and amplitude \n
+tone: (DSaw and DPulse only) frequency-dependent band pass filter before distortion and amplitude \n
+width: (DPulse and LFPulse and LFNoiseA only) duty cycle of square waves. Left = more low values, right = more high values. \n
+For LFNoiseA, controls speed of internal rate oscillator. Left = more consistent, right = more extreme fluctuations. \n
+distort: Applies the selected distortion type. Knob controls pre-distortion gain. (tanh will distort even at knob = 0) \n
+postFilter: Resonant low pass filter post distortion, pre-amplitude. \n
+Q: postFilter resonance value \n");
 		labelKnob1 = LabelKnob.new(composite, 2, 20, "freq", this);
 		labelKnob2 = LabelKnob.new(composite, 49, 20, "amp", this);
 		labelKnob3 = LabelKnob.new(composite, 96, 20, "preFilter", this);
@@ -121,7 +130,7 @@ To fade output sends in, use the fadetime field on the output panel instead.");
 		});
 		oscType.toolTip_("Use this menu to select the oscillator type.");
 		oscType.allowsReselection = true;
-		oscType.background = ~colourList.at(nDef.key).blend(Color.grey, 0.4);
+		oscType.background = (~colourList.at(nDef.key) ?? {Color.new(0.7, 0.5, 0.5, 0.8)}).blend(Color.grey, 0.4);
 		distortSelector = PopUpMenu.new(composite, Rect(109, 280, 81, 17));
 		distortSelector.background = Color.new255(217, 51, 90, 155).blend(Color.grey, 0.8);
 		distortSelector.items_(["no dist", "tanh", "clip2", "distort", "fold2"]);
@@ -222,7 +231,7 @@ To fade output sends in, use the fadetime field on the output panel instead.");
 
 	sync {
 		syncToClock = 1;
-		clockPanel.clock.schedAbs(clockPanel.clock.nextTimeOnGrid, {
+		~a.clock.clock.schedAbs(~a.clock.clock.nextTimeOnGrid, {
 			nDef.set(\sync, 1);
 			nDef.set(\t_reset, 1);
 		});
@@ -275,7 +284,7 @@ To fade output sends in, use the fadetime field on the output panel instead.");
 			\noteArray, noteArray,
 			\noteArrayField, noteArrayField.value,
 			\transpose, transpose,
-			\transposeField, transposeField.value.postln,
+			\transposeField, transposeField.value,
 			\distort, distort,
 			\distortSelector, distortSelector.value,
 		]);

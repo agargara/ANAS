@@ -7,7 +7,7 @@ PatternPanel {
 	}
 	initPatternPanel {
 		type = \freq;
-		adsr = ~a.adsr1.nDef;
+	    adsr = Ndef(\none);
 		inputList = [\none];
 		receivingInput = 0;
 		inputResponder = InputResponder.new(Ndef((nDef.key.asString++"input").asSymbol), this);
@@ -21,6 +21,7 @@ PatternPanel {
 		patternField.action_({|field|
 			Pdefn((nDef.key.asString ++"val").asSymbol, field.value.interpret);
 		});
+		patternField.toolTip_("Enter a pattern here; for example Pseq([0,3,10], inf). \n The menu to the right determines how this pattern is interpreted. \n Freq: You can enter interval numbers in semitones, 0 being the original pitch. Pseq([0,3,7,10], inf) would give you a minor 7th arpeggio. \n Note: Same as freq, but also triggers the ADSR selected in the third menu every time a new value is output. \n ADSR: This field is ignored, and 0s and 1s are output according to the duration and legato fields below.");
 		patternField2 = TextField.new(composite, Rect(2, 21, 165, 18));
 		patternField2.background = Color.new255(105, 80, 100, 125);
 		patternField2.stringColor_(Color.new255(255,255,255,255)).string_("duration");
@@ -32,12 +33,12 @@ PatternPanel {
 		patternField3.background = Color.new255(105, 80, 100, 125);	patternField3.stringColor_(Color.new255(255,255,255,255)).string_("legato").font_(Font("Helvetica", 11));
 		patternField3.action_({|field|
 			Pdefn((nDef.key.asString ++ "legato").asSymbol, field.value.interpret);
-		});
+		}).toolTip_("Input a pattern to control what fraction of the duration passes before the adsr envelope enters its release portion. Only works in 'note' or 'adsr' modes.");
 		patternField4 = TextField.new(composite, Rect(2, 59, 165, 18));
 		patternField4.background = Color.new255(105, 80, 100, 125);	patternField4.stringColor_(Color.new255(255,255,255,255)).string_("lag").font_(Font("Helvetica", 11));
 		patternField4.action_({|field|
 			Pdefn((nDef.key.asString ++ "lag").asSymbol, field.value.interpret);
-		});
+		}).toolTip_("Input a pattern to control the portamento between values.");
 		[patternField, patternField2, patternField3, patternField4].do({|item|
 			item.mouseDownAction_({item.string = "";item.mouseDownAction_({})});
 		});
@@ -61,10 +62,14 @@ PatternPanel {
 			});
 			Tdef(nDef.key).stop.play(anasGui.clock.clock);
 			durPat.reset;
-		}).allowsReselection_(true);
+		}).allowsReselection_(true).toolTip_("Use this menu to select a trigger source for this pattern. \n
+None: This panel will use its own 'duration' field to generate durations for the next value\n
+P1-3: This panel will output the next value when the respective pattern panel 1-3 output its next value\n
+Input: This panel will accept a signal input and output its next value when the signal crosses from nonpositive to positive.");
 		adsrSelector = PopUpMenu.new(composite, Rect(167, 40, 50, 18));
 		adsrSelector.items_(["adsr1", "adsr2"]);
-		adsrSelector.action_({|selector| adsr = Ndef(selector.item.asSymbol)});
+		adsrSelector.action_({|selector| adsr = Ndef(selector.item.asSymbol);this.rebuild}).background_(Color.new255(200, 150, 200, 175));
+		adsrSelector.toolTip_("Use this menu to select which adsr gets triggered when this pattern is set to 'note' or 'adsr' modes.").allowsReselection_(true);
 		[typeSelector, syncSelector, adsrSelector].do({|item|
 			item.font_(Font("Helvetica", 11));
 		});
@@ -77,16 +82,7 @@ PatternPanel {
 		currentDur = 1;
 		durPat = 1;
 		valPat = 0;
-		/*Pdef(nDef.key,
-			Pbind(
-				\freq, \rest,
-				\dur, Pdefn((nDef.key.asString ++ "dur").asSymbol),
-				\val, Pdefn((nDef.key.asString ++ "val").asSymbol).midiratio.explin(0.1, 2.5, -1, 1, \min),
-				\send, Pfunc({|event|
-					nDef.set(\input, event.at(\val));
-				})
-			)
-		).postln.play;*/
+
 		valPat = Pdefn((nDef.key.asString ++ "val").asSymbol, Pn(0)).asStream;
 		durPat = Pdefn((nDef.key.asString ++ "dur").asSymbol, Pn(0.3)).asStream;
 		legatoPat = Pdefn((nDef.key.asString ++ "legato").asSymbol, Pn(0.1)).asStream;
@@ -98,7 +94,7 @@ PatternPanel {
 				currentDur = durPat.next;
 				switch(type,
 					\freq, {nDef.set(\input, (valPat.next - 12).midiratio.explin(0.1, 2.5, -1, 1, \min))},
-					\ADSR, {nDef.set(\input, 1);
+					\ADSR, {nDef.set(\input, 1); adsr.set(\t_pgate, 1);
 						{(valPat.next*currentDur).wait;nDef.set(\input, 0)}.fork;
 					}
 				);
@@ -138,7 +134,7 @@ PatternPanel {
 					\ADSR, {nDef.set(\input, 1);
 						{(valPat.next*currentDur).wait;nDef.set(\input, 0)}.fork(anasGui.clock.clock);
 					}
-				);
+				);≤≥≥
 				condition.test = true;
 				condition.signal;
 				condition.test = false;
@@ -150,7 +146,7 @@ PatternPanel {
 
 	sync {
 		anasGui.clock.clock.schedAbs(anasGui.clock.clock.nextTimeOnGrid, {
-			Tdef(nDef.key).reset;
+			Tdef(nDef.key).reset.play;
 			valPat.reset;
 			durPat.reset;
 			legatoPat.reset;
@@ -162,17 +158,17 @@ PatternPanel {
 	save {
 		var saveList = Dictionary.new;
 		saveList.putPairs([
-			\valPat, patternField.value,
-			\durPat, patternField2.value,
-			\legatoPat, patternField3.value,
-			\lagPat, patternField4.value,
+			\valPat, if (patternField.value.asSymbol != \value, {patternField.value}, {"Pn(0)"}),
+			\durPat,  if (patternField2.value.asSymbol != \duration, {patternField2.value}, {"Pn(0.3)"}),
+			\legatoPat, if (patternField3.value.asSymbol != \legato, {patternField3.value}, {"Pn(0.3)"}),
+			\lagPat, if (patternField4.value.asSymbol != \lag, {patternField4.value}, {"Pn(0)"}),
 			\syncSelector, syncSelector.value,
 			\syncOn, syncOn,
 			\typeSelector, typeSelector.value,
 			\type, type,
 			\adsrSelector, adsrSelector.value,
 			\adsr, adsr.asCompileString,
-			\inputList, inputList,
+			\inputList, inputList,≥
 			\inputSelector, inputSelector.value,
 		]);
 		^saveList;
